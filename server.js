@@ -1,5 +1,15 @@
 'use strict';
 
+// bring in firestore
+const Firestore = require("@google-cloud/firestore");
+
+// initialize Firestore and set project id from env var
+const firestore = new Firestore(
+    {
+        projectId: process.env.GOOGLE_CLOUD_PROJECT
+    }
+);
+
 // express is a nodejs web server
 // https://www.npmjs.com/package/express
 const express = require('express');
@@ -45,6 +55,7 @@ app.get('/version', (req, res) => {
 // if you went on to develop this as a real application.
 app.get('/events', (req, res) => {
     res.json(mockEvents);
+    getEvents(req,res);
 });
 
 // Adds an event - in a real solution, this would insert into a cloud datastore.
@@ -57,6 +68,10 @@ app.post('/event', (req, res) => {
         description: req.body.description,
         id : mockEvents.events.length + 1
      }
+    // this will create the Events collection if it does not exist
+    firestore.collection("Events").add(ev).then(ret => {
+        getEvents(req, res);
+    })     
     // add to the mock array
     mockEvents.events.push(ev);
     // return the complete array
@@ -74,5 +89,25 @@ const server = app.listen(PORT, () => {
     const port = server.address().port;
     console.log(`Events app listening at http://${host}:${port}`);
 });
+
+function getEvents(req, res) {
+    firestore.collection("Events").get()
+        .then((snapshot) => {
+            if (!snapshot.empty) {
+                const ret = { events: []};
+                snapshot.docs.forEach(element => {
+                    ret.events.push(element.data());
+                }, this);
+                console.log(ret);
+                res.json(ret);
+            } else {
+                 res.json(mockEvents);
+            }
+        })
+        .catch((err) => {
+            console.error('Error getting events', err);
+            res.json(mockEvents);
+        });
+};
 
 module.exports = app;
